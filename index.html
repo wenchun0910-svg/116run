@@ -53,7 +53,7 @@
             <div class="md:col-span-2">
                 <h2 class="text-xl font-bold text-[#8B5A2B] mb-4 border-b-2 border-[#8B5A2B] pb-2 inline-block">學生座號</h2>
                 <p id="instructionText" class="text-gray-500 text-sm mb-4">請先於左側輸入人數並點擊確定。</p>
-                <div id="studentButtonsContainer" class="flex flex-wrap gap-3">
+                <div id="studentButtonsContainer" class="flex flex-wrap gap-4">
                     <!-- Buttons will be generated here -->
                 </div>
             </div>
@@ -106,7 +106,14 @@
         // Firebase Configuration (from environment variables)
         let firebaseConfig = {};
         try {
-            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+           const firebaseConfig = {
+  apiKey: "AIzaSyALKXsEZe0fi0kgISPJu2yNAzle5l3jGUc",
+  authDomain: "run-35022.firebaseapp.com",
+  projectId: "run-35022",
+  storageBucket: "run-35022.firebasestorage.app",
+  messagingSenderId: "816498414456",
+  appId: "1:816498414456:web:ab6753528d46eb611bae8d"
+};
         } catch (e) {
             console.warn("無法解析 __firebase_config，請確保環境變數已設定。");
         }
@@ -257,7 +264,7 @@
 
             for (let i = 1; i <= count; i++) {
                 const btn = document.createElement('button');
-                btn.className = "w-14 h-14 rounded-full bg-[#f4e0c4] border-2 border-[#d3b48d] text-[#8B5A2B] font-bold text-lg shadow-sm hover:bg-[#e6ceac] hover:shadow-md transition-all active:scale-95 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed";
+                btn.className = "w-16 h-16 rounded-full bg-[#f4e0c4] border-2 border-[#d3b48d] text-[#8B5A2B] font-bold text-2xl shadow-md hover:bg-[#e6ceac] hover:shadow-lg transition-all active:scale-95 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed";
                 btn.textContent = i;
                 btn.disabled = !isRunning; 
                 btn.dataset.studentId = i;
@@ -301,6 +308,12 @@
                 if (Object.keys(studentRecords).length > 0) {
                      studentRecords = {};
                      updateTable();
+                     
+                     // Reset button colors
+                     const buttons = studentButtonsContainer.querySelectorAll('button');
+                     buttons.forEach(btn => {
+                         btn.className = "w-16 h-16 rounded-full bg-[#f4e0c4] border-2 border-[#d3b48d] text-[#8B5A2B] font-bold text-2xl shadow-md hover:bg-[#e6ceac] hover:shadow-lg transition-all active:scale-95 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed";
+                     });
                 }
 
                 isRunning = true;
@@ -336,11 +349,14 @@
             }
             studentRecords[studentId].push(timeStr);
 
-            // Visual feedback on the button
-            const originalColor = btnElement.className;
-            btnElement.classList.add('bg-[#8fbc8f]', 'text-white', 'border-[#556b2f]', 'scale-110');
+            // Visual feedback on the button (permanent color change to indicate it was clicked)
+            btnElement.classList.remove('bg-[#f4e0c4]', 'text-[#8B5A2B]', 'border-[#d3b48d]');
+            btnElement.classList.add('bg-[#8fbc8f]', 'text-white', 'border-[#556b2f]');
+            
+            // Temporary scale effect
+            btnElement.classList.add('scale-110');
             setTimeout(() => {
-                btnElement.classList.remove('bg-[#8fbc8f]', 'text-white', 'border-[#556b2f]', 'scale-110');
+                btnElement.classList.remove('scale-110');
             }, 300);
 
             updateTable();
