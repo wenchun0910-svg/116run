@@ -82,8 +82,18 @@
     </header>
 
     <!-- Main Content -->
-    <main class="flex-grow p-4 md:p-6 max-w-7xl mx-auto w-full flex flex-col gap-6">
+    <main class="flex-grow p-4 md:p-6 max-w-7xl mx-auto w-full flex flex-col gap-4 md:gap-6">
         
+        <!-- Settings Card (移至最上方) -->
+        <section class="w-full max-w-3xl mx-auto">
+            <div class="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-100 flex justify-center items-center gap-3 md:gap-4">
+                <label for="studentCount" class="text-lg md:text-xl font-serif font-bold text-ruri whitespace-nowrap">班級人數：</label>
+                <input type="number" id="studentCount" min="1" max="100" value="30" 
+                       class="w-20 md:w-24 text-xl md:text-2xl text-center border-2 border-gray-200 rounded-lg p-1 md:p-2 focus:outline-none focus:border-asagi transition-colors bg-washi text-sumi font-bold">
+                <span class="text-xs md:text-sm text-silver whitespace-nowrap">(系統將自動儲存設定)</span>
+            </div>
+        </section>
+
         <!-- Timer Block (Always at the top) -->
         <section class="w-full max-w-3xl mx-auto">
             <div class="bg-white p-4 md:p-6 rounded-xl shadow-md border-t-8 border-ruri text-center flex flex-col items-center relative">
@@ -104,18 +114,8 @@
         <!-- Two Columns Layout for Students & Results -->
         <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            <!-- Left Panel: Settings & Students -->
+            <!-- Left Panel: Students -->
             <div class="lg:col-span-7 flex flex-col gap-6">
-                <!-- Settings Card -->
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                    <div class="flex items-center gap-4">
-                        <label for="studentCount" class="text-lg font-serif font-bold text-ruri">班級人數：</label>
-                        <input type="number" id="studentCount" min="1" max="100" value="30" 
-                               class="w-24 text-xl text-center border-2 border-gray-200 rounded-lg p-2 focus:outline-none focus:border-asagi transition-colors bg-washi text-sumi font-bold">
-                        <span class="text-sm text-silver">(系統將自動儲存設定)</span>
-                    </div>
-                </div>
-
                 <!-- Student Buttons Grid -->
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex-grow relative">
                     <h2 class="text-xl font-serif font-bold text-sumi mb-5 border-l-4 border-asagi pl-3">點擊座號記錄成績</h2>
@@ -190,7 +190,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <h3 class="text-2xl font-serif font-bold text-sumi mb-4">管理員登入</h3>
-            <input type="password" id="adminPasswordInput" placeholder="請輸入密碼 " class="w-full text-xl text-center border-2 border-gray-200 rounded-lg p-3 mb-6 focus:outline-none focus:border-ruri bg-washi">
+            <input type="password" id="adminPasswordInput" placeholder="請輸入密碼" class="w-full text-xl text-center border-2 border-gray-200 rounded-lg p-3 mb-6 focus:outline-none focus:border-ruri bg-washi">
             <button id="verifyPasswordBtn" class="w-full px-6 py-3 rounded-lg bg-ruri text-white font-serif font-bold text-lg hover:bg-ruri-dark transition-colors">登入系統</button>
         </div>
     </div>
@@ -231,7 +231,7 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         try {
-           const firebaseConfig = {
+            const firebaseConfig = {
   apiKey: "AIzaSyALKXsEZe0fi0kgISPJu2yNAzle5l3jGUc",
   authDomain: "run-35022.firebaseapp.com",
   projectId: "run-35022",
@@ -239,6 +239,7 @@
   messagingSenderId: "816498414456",
   appId: "1:816498414456:web:ab6753528d46eb611bae8d"
 };
+
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
@@ -642,7 +643,7 @@
                 let headerRow = ["座號"];
                 for (let s = 0; s < sessionsToExport.length; s++) {
                     headerRow.push(`第${s + 1}次時間`);
-                    headerRow.push(`第${s + 1}次順序`);
+                    // 移除了排名的欄位標題
                 }
                 csvContent += headerRow.join(",") + "\n";
                 
@@ -653,10 +654,9 @@
                         const record = sessionRecords.find(r => r.seat === i);
                         if (record) {
                             row.push(record.time);
-                            row.push(record.order);
+                            // 移除了排名的資料
                         } else {
                             row.push("未完成");
-                            row.push("-");
                         }
                     }
                     csvContent += row.join(",") + "\n";
