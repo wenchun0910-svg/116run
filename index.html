@@ -231,7 +231,7 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         try {
-             const firebaseConfig = {
+              const firebaseConfig = {
   apiKey: "AIzaSyALKXsEZe0fi0kgISPJu2yNAzle5l3jGUc",
   authDomain: "run-35022.firebaseapp.com",
   projectId: "run-35022",
@@ -244,11 +244,17 @@
             auth = getAuth(app);
             db = getFirestore(app);
 
+            // 優化：加入 try-catch 確保手機版若 Token 驗證失敗也能強制使用匿名登入
             const initAuth = async () => {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (err) {
+                    console.error("Auth error, fallback to anonymous", err);
+                    await signInAnonymously(auth).catch(e => console.error(e));
                 }
             };
             
@@ -258,7 +264,7 @@
                 if (user) {
                     currentUser = user;
                     firebaseReady = true;
-                    loadSettingsFromFirebase(); // 連線成功後，載入雲端設定
+                    loadSettingsFromFirebase(); 
                 } else {
                     firebaseReady = false;
                     currentUser = null;
@@ -462,7 +468,8 @@
             }
         }
 
-        function toggleTimer() {
+        // 優化：將 toggleTimer 變成非同步 (async)，確保上傳完成前鎖定按鈕
+        async function toggleTimer() {
             if (!isRunning) {
                 isRunning = true;
                 if (startTime === 0) {
@@ -489,17 +496,25 @@
             } else {
                 isRunning = false;
                 clearInterval(timerInterval);
-                startStopBtn.textContent = '計時開始';
-                startStopBtn.classList.remove('bg-silver', 'hover:bg-gray-500', 'border-gray-500');
-                startStopBtn.classList.add('bg-ruri', 'hover:bg-ruri-dark', 'border-ruri-dark');
                 
-                // 按下計時結束時，若有成績則自動觸發雲端儲存
+                // 改變按鈕為「上傳中」狀態，防止使用者急著關閉視窗
+                startStopBtn.textContent = '資料上傳中...';
+                startStopBtn.classList.remove('bg-ruri', 'hover:bg-ruri-dark', 'border-ruri-dark', 'hover:bg-gray-500', 'border-gray-500');
+                startStopBtn.classList.add('bg-silver', 'cursor-wait');
+                startStopBtn.disabled = true;
+                
+                // 按下計時結束時，若有成績則等待自動上傳完成
                 if (records.length > 0 && !isSessionSaved) {
-                    showToast('計時結束，正在自動儲存成績...', 'info');
-                    saveAllToFirebase();
+                    await saveAllToFirebase();
                 } else {
                     showToast('計時已結束。', 'info');
                 }
+
+                // 上傳完成，恢復按鈕原本樣貌
+                startStopBtn.textContent = '計時開始';
+                startStopBtn.classList.remove('bg-silver', 'cursor-wait');
+                startStopBtn.classList.add('bg-ruri', 'hover:bg-ruri-dark', 'border-ruri-dark');
+                startStopBtn.disabled = false;
             }
         }
 
@@ -547,6 +562,15 @@
             }
 
             updateTableUI();
+
+            // 新增：如果全部學生都測驗完畢，自動幫老師結束計時並上傳！
+            const totalStudents = parseInt(studentCountInput.value);
+            if (records.length === totalStudents) {
+                if (isRunning) {
+                    showToast('全班測驗完畢！正在自動結束並上傳...', 'success');
+                    await toggleTimer(); // 呼叫 toggleTimer 自動走完結束與上傳流程
+                }
+            }
         }
 
         function updateTableUI() {
@@ -575,7 +599,7 @@
             if (records.length === 0) return;
             if (isSessionSaved) return;
             if (!firebaseReady || !currentUser || !db) {
-                showToast("Firebase尚未連線，資料將只保存在目前的畫面中。", 'error');
+                showToast("連線異常，資料將僅保留在畫面上，請先不要關閉視窗！", 'error');
                 return;
             }
 
@@ -589,14 +613,14 @@
                     studentCount: studentCountInput.value,
                     records: sortedRecords, 
                     timestamp: serverTimestamp(),
-                    className: APP_TITLE // 儲存目前的標題做為辨識
+                    className: APP_TITLE 
                 });
                 
                 isSessionSaved = true;
-                showToast("✅ 成績已自動上傳至雲端資料庫！", 'success');
+                showToast("✅ 成績已成功上傳至雲端資料庫！", 'success');
             } catch (error) {
                 console.error("Firebase save error: ", error);
-                showToast("自動上傳失敗，請檢查網路連線", 'error');
+                showToast("上傳失敗，請檢查手機網路連線", 'error');
             }
         }
 
@@ -659,9 +683,8 @@
                     let fetchedSessions = [];
                     querySnapshot.forEach((doc) => {
                         const data = doc.data();
-                        if (data.userId === currentUser.uid) {
-                            fetchedSessions.push(data);
-                        }
+                        // 移除 userId 的限制，讓所有裝置都能讀取同一個共用資料庫的成績
+                        fetchedSessions.push(data);
                     });
                     
                     fetchedSessions.sort((a, b) => {
@@ -767,9 +790,8 @@
                 let fetchedSessions = [];
                 querySnapshot.forEach((docSnap) => {
                     const data = docSnap.data();
-                    if (data.userId === currentUser.uid) {
-                        fetchedSessions.push({ id: docSnap.id, ...data });
-                    }
+                    // 移除 userId 的限制，讓管理員在任何裝置登入都能看到全部成績
+                    fetchedSessions.push({ id: docSnap.id, ...data });
                 });
 
                 fetchedSessions.sort((a, b) => {
