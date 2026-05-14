@@ -220,7 +220,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, getDocs, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // 新增引入 onSnapshot 用於即時監聽資料庫變更
+        import { getFirestore, collection, addDoc, serverTimestamp, getDocs, deleteDoc, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase Setup
         let db;
@@ -244,7 +245,6 @@
             auth = getAuth(app);
             db = getFirestore(app);
 
-            // 優化：加入 try-catch 確保手機版若 Token 驗證失敗也能強制使用匿名登入
             const initAuth = async () => {
                 try {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -264,7 +264,8 @@
                 if (user) {
                     currentUser = user;
                     firebaseReady = true;
-                    loadSettingsFromFirebase(); 
+                    // 將原本的讀取改為「啟動即時監聽」
+                    setupSettingsListener(); 
                 } else {
                     firebaseReady = false;
                     currentUser = null;
@@ -312,16 +313,24 @@
 
         // --- Core Functions ---
 
-        // 讀取 Firebase 雲端設定
-        async function loadSettingsFromFirebase() {
+        // 改為：即時監聽 Firebase 雲端設定 (讓電腦改標題，手機馬上自動跟著變)
+        let settingsUnsubscribe = null;
+        function setupSettingsListener() {
             if (!firebaseReady || !db) return;
-            try {
-                const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
-                const docSnap = await getDoc(settingsRef);
+            
+            const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
+            
+            // 如果已經在監聽，先取消舊的
+            if (settingsUnsubscribe) {
+                settingsUnsubscribe();
+            }
+
+            // onSnapshot 會在資料庫有任何變動時「自動觸發」
+            settingsUnsubscribe = onSnapshot(settingsRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     
-                    // 1. 同步人數設定
+                    // 1. 即時同步人數設定
                     if (data.studentCount) {
                         const count = data.studentCount;
                         if (parseInt(studentCountInput.value) !== count) {
@@ -334,7 +343,7 @@
                         }
                     }
                     
-                    // 2. 同步標題設定
+                    // 2. 即時同步標題設定
                     if (data.appTitle) {
                         const cloudTitle = data.appTitle;
                         if (APP_TITLE !== cloudTitle) {
@@ -345,9 +354,9 @@
                         }
                     }
                 }
-            } catch(error) {
-                console.error("Load settings error:", error);
-            }
+            }, (error) => {
+                console.error("即時監聽設定失敗:", error);
+            });
         }
 
         // 儲存設定至 Firebase 雲端 (支援多個屬性)
