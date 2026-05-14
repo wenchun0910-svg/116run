@@ -155,13 +155,7 @@
 
     <!-- Floating Action Buttons (Bottom Right) -->
     <div class="fixed bottom-6 right-6 flex flex-col gap-4 z-20">
-        <!-- 雲端儲存按鈕 -->
-        <button id="saveBtn" class="w-16 h-16 bg-asagi hover:bg-asagi-dark text-white rounded-full shadow-xl flex items-center justify-center transform transition-all active:scale-90 group relative border-2 border-white">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <span class="absolute right-full mr-4 bg-gray-800 text-white text-sm px-3 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none font-serif">儲存至資料庫</span>
-        </button>
+        <!-- 移除了原本的儲存至資料庫按鈕，只保留下載與重置 -->
 
         <!-- 下載 Excel 按鈕 -->
         <button id="exportBtn" class="w-16 h-16 bg-ruri hover:bg-ruri-dark text-white rounded-full shadow-xl flex items-center justify-center transform transition-all active:scale-90 group relative border-2 border-white">
@@ -190,7 +184,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <h3 class="text-2xl font-serif font-bold text-sumi mb-4">管理員登入</h3>
-            <input type="password" id="adminPasswordInput" placeholder="請輸入密碼" class="w-full text-xl text-center border-2 border-gray-200 rounded-lg p-3 mb-6 focus:outline-none focus:border-ruri bg-washi">
+            <input type="password" id="adminPasswordInput" placeholder="請輸入密碼 (預設: 1234)" class="w-full text-xl text-center border-2 border-gray-200 rounded-lg p-3 mb-6 focus:outline-none focus:border-ruri bg-washi">
             <button id="verifyPasswordBtn" class="w-full px-6 py-3 rounded-lg bg-ruri text-white font-serif font-bold text-lg hover:bg-ruri-dark transition-colors">登入系統</button>
         </div>
     </div>
@@ -237,7 +231,7 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         try {
-           const firebaseConfig = {
+                     const firebaseConfig = {
   apiKey: "AIzaSyALKXsEZe0fi0kgISPJu2yNAzle5l3jGUc",
   authDomain: "run-35022.firebaseapp.com",
   projectId: "run-35022",
@@ -245,6 +239,7 @@
   messagingSenderId: "816498414456",
   appId: "1:816498414456:web:ab6753528d46eb611bae8d"
 };
+
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
@@ -294,8 +289,7 @@
         const resultsTableBody = document.getElementById('resultsTableBody');
         const resetBtn = document.getElementById('resetBtn');
         const exportBtn = document.getElementById('exportBtn');
-        const saveBtn = document.getElementById('saveBtn'); 
-        const toastContainer = document.getElementById('toastContainer');
+        const toastContainer = document.getElementById('toastContainer'); // 移除了 saveBtn
 
         const adminLoginBtn = document.getElementById('adminLoginBtn');
         const adminLoginModal = document.getElementById('adminLoginModal');
@@ -351,7 +345,7 @@
             startStopBtn.addEventListener('click', toggleTimer);
             resetBtn.addEventListener('click', confirmReset);
             exportBtn.addEventListener('click', exportToCSV);
-            saveBtn.addEventListener('click', saveAllToFirebase); 
+            // 移除了手動儲存監聽器
 
             // Admin Listners
             adminLoginBtn.addEventListener('click', () => {
@@ -463,7 +457,14 @@
                 startStopBtn.textContent = '計時開始';
                 startStopBtn.classList.remove('bg-silver', 'hover:bg-gray-500', 'border-gray-500');
                 startStopBtn.classList.add('bg-ruri', 'hover:bg-ruri-dark', 'border-ruri-dark');
-                showToast('計時已結束，請檢視成績表格。', 'info');
+                
+                // 按下計時結束時，若有成績則自動觸發雲端儲存
+                if (records.length > 0 && !isSessionSaved) {
+                    showToast('計時結束，正在自動儲存成績...', 'info');
+                    saveAllToFirebase();
+                } else {
+                    showToast('計時已結束。', 'info');
+                }
             }
         }
 
@@ -537,23 +538,14 @@
             });
         }
 
+        // 修改儲存邏輯，以適應背景自動執行
         async function saveAllToFirebase() {
-            if (records.length === 0) {
-                showToast("目前沒有成績可以儲存！", 'error');
-                return;
-            }
-            if (isSessionSaved) {
-                showToast("這筆成績已經儲存過了喔！", 'info');
-                return;
-            }
+            if (records.length === 0) return;
+            if (isSessionSaved) return;
             if (!firebaseReady || !currentUser || !db) {
                 showToast("Firebase尚未連線，資料將只保存在目前的畫面中。", 'error');
                 return;
             }
-
-            const originalBtnContent = saveBtn.innerHTML;
-            saveBtn.innerHTML = `<svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
-            saveBtn.disabled = true;
 
             try {
                 const sessionRef = collection(db, 'artifacts', appId, 'public', 'data', 'run_sessions');
@@ -569,13 +561,10 @@
                 });
                 
                 isSessionSaved = true;
-                showToast("✅ 全班成績已成功上傳至雲端資料庫！", 'success');
+                showToast("✅ 成績已自動上傳至雲端資料庫！", 'success');
             } catch (error) {
                 console.error("Firebase save error: ", error);
-                showToast("成績上傳失敗，請檢查網路連線", 'error');
-            } finally {
-                saveBtn.innerHTML = originalBtnContent;
-                saveBtn.disabled = false;
+                showToast("自動上傳失敗，請檢查網路連線", 'error');
             }
         }
 
