@@ -90,7 +90,7 @@
                 <label for="studentCount" class="text-lg md:text-xl font-serif font-bold text-ruri whitespace-nowrap">班級人數：</label>
                 <input type="number" id="studentCount" min="1" max="100" value="30" 
                        class="w-20 md:w-24 text-xl md:text-2xl text-center border-2 border-gray-200 rounded-lg p-1 md:p-2 focus:outline-none focus:border-asagi transition-colors bg-washi text-sumi font-bold">
-                <span class="text-xs md:text-sm text-silver whitespace-nowrap">(系統將自動儲存設定)</span>
+                <span class="text-xs md:text-sm text-silver whitespace-nowrap">(人數設定將自動同步至雲端)</span>
             </div>
         </section>
 
@@ -220,7 +220,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, getDocs, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase Setup
         let db;
@@ -231,7 +231,7 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         try {
-            const firebaseConfig = {
+             const firebaseConfig = {
   apiKey: "AIzaSyALKXsEZe0fi0kgISPJu2yNAzle5l3jGUc",
   authDomain: "run-35022.firebaseapp.com",
   projectId: "run-35022",
@@ -258,6 +258,7 @@
                 if (user) {
                     currentUser = user;
                     firebaseReady = true;
+                    loadSettingsFromFirebase(); // 連線成功後，載入雲端設定
                 } else {
                     firebaseReady = false;
                     currentUser = null;
@@ -305,6 +306,39 @@
 
         // --- Core Functions ---
 
+        // 讀取 Firebase 雲端設定
+        async function loadSettingsFromFirebase() {
+            if (!firebaseReady || !db) return;
+            try {
+                const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
+                const docSnap = await getDoc(settingsRef);
+                if (docSnap.exists() && docSnap.data().studentCount) {
+                    const count = docSnap.data().studentCount;
+                    if (parseInt(studentCountInput.value) !== count) {
+                        studentCountInput.value = count;
+                        localStorage.setItem('changan_student_count', count);
+                        // 若尚未開始計時，自動重新渲染學生按鈕
+                        if (!isRunning && records.length === 0) {
+                            renderStudentButtons(count);
+                        }
+                    }
+                }
+            } catch(error) {
+                console.error("Load settings error:", error);
+            }
+        }
+
+        // 儲存設定至 Firebase 雲端
+        async function saveSettingsToFirebase(count) {
+            if (!firebaseReady || !db) return;
+            try {
+                const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
+                await setDoc(settingsRef, { studentCount: count }, { merge: true });
+            } catch(error) {
+                console.error("Save settings error:", error);
+            }
+        }
+
         function showToast(message, type = 'info') {
             const toast = document.createElement('div');
             const bgColors = {
@@ -340,6 +374,7 @@
                 if (count > 100) { count = 100; e.target.value = 100; }
                 localStorage.setItem('changan_student_count', count);
                 renderStudentButtons(count);
+                saveSettingsToFirebase(count); // 人數改變時，同步上傳至 Firebase
             });
 
             startStopBtn.addEventListener('click', toggleTimer);
