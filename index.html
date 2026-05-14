@@ -231,7 +231,7 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         try {
-              const firebaseConfig = {
+             const firebaseConfig = {
   apiKey: "AIzaSyALKXsEZe0fi0kgISPJu2yNAzle5l3jGUc",
   authDomain: "run-35022.firebaseapp.com",
   projectId: "run-35022",
@@ -318,14 +318,30 @@
             try {
                 const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
                 const docSnap = await getDoc(settingsRef);
-                if (docSnap.exists() && docSnap.data().studentCount) {
-                    const count = docSnap.data().studentCount;
-                    if (parseInt(studentCountInput.value) !== count) {
-                        studentCountInput.value = count;
-                        localStorage.setItem('changan_student_count', count);
-                        // 若尚未開始計時，自動重新渲染學生按鈕
-                        if (!isRunning && records.length === 0) {
-                            renderStudentButtons(count);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    // 1. 同步人數設定
+                    if (data.studentCount) {
+                        const count = data.studentCount;
+                        if (parseInt(studentCountInput.value) !== count) {
+                            studentCountInput.value = count;
+                            localStorage.setItem('changan_student_count', count);
+                            // 若尚未開始計時，自動重新渲染學生按鈕
+                            if (!isRunning && records.length === 0) {
+                                renderStudentButtons(count);
+                            }
+                        }
+                    }
+                    
+                    // 2. 同步標題設定
+                    if (data.appTitle) {
+                        const cloudTitle = data.appTitle;
+                        if (APP_TITLE !== cloudTitle) {
+                            APP_TITLE = cloudTitle;
+                            localStorage.setItem('changan_app_title', APP_TITLE);
+                            mainTitle.textContent = APP_TITLE;
+                            document.title = APP_TITLE;
                         }
                     }
                 }
@@ -334,12 +350,12 @@
             }
         }
 
-        // 儲存設定至 Firebase 雲端
-        async function saveSettingsToFirebase(count) {
+        // 儲存設定至 Firebase 雲端 (支援多個屬性)
+        async function updateSettingsInFirebase(settingsData) {
             if (!firebaseReady || !db) return;
             try {
                 const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
-                await setDoc(settingsRef, { studentCount: count }, { merge: true });
+                await setDoc(settingsRef, settingsData, { merge: true });
             } catch(error) {
                 console.error("Save settings error:", error);
             }
@@ -380,7 +396,7 @@
                 if (count > 100) { count = 100; e.target.value = 100; }
                 localStorage.setItem('changan_student_count', count);
                 renderStudentButtons(count);
-                saveSettingsToFirebase(count); // 人數改變時，同步上傳至 Firebase
+                updateSettingsInFirebase({ studentCount: count }); // 人數改變時，同步上傳至 Firebase
             });
 
             startStopBtn.addEventListener('click', toggleTimer);
@@ -437,7 +453,11 @@
                     localStorage.setItem('changan_app_title', APP_TITLE);
                     mainTitle.textContent = APP_TITLE;
                     document.title = APP_TITLE;
-                    showToast('標題名稱已成功更新！', 'success');
+                    
+                    // 新增：標題改變時，同步上傳至 Firebase
+                    updateSettingsInFirebase({ appTitle: APP_TITLE });
+                    
+                    showToast('標題名稱已成功更新並同步至雲端！', 'success');
                 }
             });
         }
